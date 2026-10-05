@@ -1,0 +1,48 @@
+{
+  "name": "privacy-mcp-agent",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "electron:start": "electron .",
+    "electron:build": "npm run build && cd backend && .\\.venv\\Scripts\\python.exe -m PyInstaller --name backend --onefile --add-data \"servers;servers\" --add-data \"..\\dist;dist\" main.py && cd .. && electron-builder"
+  },
+  "build": {
+    "appId": "com.privacy.mcpagent",
+    "productName": "Privacy MCP Agent",
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "extraResources": [
+      {
+        "from": "backend/dist/backend.exe",
+        "to": "backend.exe"
+      }
+    ]
+  },
+  "dependencies": {
+    "framer-motion": "^14.0.0",
+    "lucide-react": "^1.52.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.1.1",
+    "concurrently": "^10.0.5",
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3",
+    "oxlint": "^1.81.0",
+    "vite": "^8.3.0",
+    "wait-on": "^9.5.1"
+  }
+}
