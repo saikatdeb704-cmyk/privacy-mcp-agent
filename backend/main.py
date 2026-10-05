@@ -127,7 +127,9 @@ class MCPHub:
 
 hub = MCPHub()
 
-if os.environ.get("GROQ_API_KEY"):
+if os.environ.get("GEMINI_API_KEY"):
+    llm = AsyncOpenAI(api_key=os.environ.get("GEMINI_API_KEY"), base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
+elif os.environ.get("GROQ_API_KEY"):
     llm = AsyncOpenAI(api_key=os.environ.get("GROQ_API_KEY"), base_url="https://api.groq.com/openai/v1")
 elif os.environ.get("OPENAI_API_KEY"):
     llm = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
