@@ -127,10 +127,10 @@ class MCPHub:
 
 hub = MCPHub()
 
-api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("GROQ_API_KEY")
-if api_key:
-    # Use Cloud Provider
-    llm = AsyncOpenAI(api_key=api_key)
+if os.environ.get("GROQ_API_KEY"):
+    llm = AsyncOpenAI(api_key=os.environ.get("GROQ_API_KEY"), base_url="https://api.groq.com/openai/v1")
+elif os.environ.get("OPENAI_API_KEY"):
+    llm = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 else:
     # Use Local Ollama via its OpenAI-compatible endpoint
     llm = AsyncOpenAI(base_url=f"{OLLAMA_HOST}/v1", api_key="ollama")
