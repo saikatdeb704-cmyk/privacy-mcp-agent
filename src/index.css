@@ -1074,3 +1074,60 @@ button { font-family: inherit; cursor: pointer; }
 .text-secondary { color: var(--text-secondary); }
 .fw-600 { font-weight: 600; }
 .fs-xs { font-size: 0.7rem; }
+
+/* ═══════════════════════════════════════════════════════
+   RESPONSIVE DESIGN (MOBILE OPTIMIZATION)
+   ═══════════════════════════════════════════════════════ */
+@media (max-width: 800px) {
+  .app-shell {
+    flex-direction: column;
+  }
+  
+  .sidebar {
+    display: none; /* Hide sidebar on mobile to prioritize chat */
+  }
+
+  .monitor-panel {
+    display: none !important; /* Hide monitor on mobile */
+  }
+
+  .messages-container {
+    padding: 1rem;
+  }
+
+  .chat-input-area {
+    padding: 0 1rem 1rem;
+  }
+  
+  .welcome-hero {
+    padding: 1.5rem 1rem;
+  }
+  
+  .welcome-title {
+    font-size: 1.2rem;
+  }
+  
+  .message-row {
+    max-width: 95%;
+  }
+  
+  .arch-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  #toggle-monitor-btn {
+    display: none;
+  }
+  
+  .panel-header {
+    padding: 0 1rem;
+  }
+  
+  .panel-header-title {
+    font-size: 0.8rem;
+  }
+
+  .header-badge.accent {
+    display: none;
+  }
+}
