@@ -253,10 +253,15 @@ async def run_agent(conv: Conversation, events: list[dict[str, Any]], queued: li
 @app.get("/api/health")
 async def health():
     models, ollama_ok, ollama_error = [], False, None
+    is_cloud = bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("GROQ_API_KEY") or os.environ.get("OPENAI_API_KEY"))
     try:
-        listed = await asyncio.wait_for(llm.models.list(), timeout=3)
-        models = [{"name": m.id, "size": getattr(m, "size", 0)} for m in listed.data]
-        ollama_ok = True
+        if is_cloud:
+            models = [{"name": DEFAULT_MODEL, "size": 0}]
+            ollama_ok = True
+        else:
+            listed = await asyncio.wait_for(llm.models.list(), timeout=3)
+            models = [{"name": m.id, "size": getattr(m, "size", 0)} for m in listed.data]
+            ollama_ok = True
     except Exception as e:
         ollama_error = str(e)
     return {
