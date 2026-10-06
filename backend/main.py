@@ -128,6 +128,8 @@ class MCPHub:
 hub = MCPHub()
 
 if os.environ.get("GEMINI_API_KEY"):
+    if "OPENAI_API_KEY" in os.environ:
+        del os.environ["OPENAI_API_KEY"]
     llm = AsyncOpenAI(api_key=os.environ.get("GEMINI_API_KEY"), base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
 elif os.environ.get("GROQ_API_KEY"):
     llm = AsyncOpenAI(api_key=os.environ.get("GROQ_API_KEY"), base_url="https://api.groq.com/openai/v1")
@@ -231,7 +233,8 @@ async def run_agent(conv: Conversation, events: list[dict[str, Any]], queued: li
         try:
             resp = await llm.chat.completions.create(model=conv.model, messages=conv.messages, tools=hub.ollama_tools() or None)
         except Exception as e:
-            raise HTTPException(502, f"LLM error: {e}")
+            debug_info = f" [DEBUG: Base URL = {llm.base_url}]"
+            raise HTTPException(502, f"LLM error: {e}{debug_info}")
 
         msg = resp.choices[0].message
         tool_calls = msg.tool_calls or []
