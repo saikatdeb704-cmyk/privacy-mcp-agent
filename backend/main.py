@@ -42,7 +42,6 @@ else:
     DIST_DIR = BASE_DIR.parent / "dist"
 
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
-DEFAULT_MODEL = "gemini-3.8-flash"
 MAX_STEPS = 8
 
 MCP_SERVERS: dict[str, Path] = {
@@ -132,14 +131,18 @@ if os.environ.get("GEMINI_API_KEY"):
         del os.environ["OPENAI_API_KEY"]
     gemini_key = os.environ.get("GEMINI_API_KEY").strip()
     llm = AsyncOpenAI(api_key=gemini_key, base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
+    DEFAULT_MODEL = "gemini-3.8-flash"
 elif os.environ.get("GROQ_API_KEY"):
     groq_key = os.environ.get("GROQ_API_KEY").strip()
     llm = AsyncOpenAI(api_key=groq_key, base_url="https://api.groq.com/openai/v1")
+    DEFAULT_MODEL = "llama3-8b-8192"
 elif os.environ.get("OPENAI_API_KEY"):
     llm = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+    DEFAULT_MODEL = "gpt-4o-mini"
 else:
     # Use Local Ollama via its OpenAI-compatible endpoint
     llm = AsyncOpenAI(base_url=f"{OLLAMA_HOST}/v1", api_key="ollama")
+    DEFAULT_MODEL = "llama3.2"
 
 
 @asynccontextmanager
