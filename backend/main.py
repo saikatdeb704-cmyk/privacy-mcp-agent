@@ -108,11 +108,21 @@ class MCPHub:
         await self.stack.aclose()
 
     def ollama_tools(self) -> list[dict[str, Any]]:
-        return [
-            {"type": "function", "function": {"name": t["name"], "description": t["description"],
-                                              "parameters": t["inputSchema"] or {"type": "object", "properties": {}}}}
-            for tools in self.tools.values() for t in tools
-        ]
+        result = []
+        for tools in self.tools.values():
+            for t in tools:
+                schema = t.get("inputSchema", {})
+                props = schema.get("properties", {})
+                
+                func = {
+                    "name": t["name"],
+                    "description": t.get("description", "")
+                }
+                if props:
+                    func["parameters"] = schema
+                
+                result.append({"type": "function", "function": func})
+        return result
 
     async def call(self, tool: str, args: dict[str, Any]) -> tuple[str, bool]:
         server = self.tool_owner.get(tool)
