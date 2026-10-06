@@ -216,7 +216,7 @@ async def _execute(conv: Conversation, call: dict[str, Any], approved_by_user: b
     except Exception as e:
         output, is_error = f"Tool execution failed: {e}", True
     latency = int((time.perf_counter() - t0) * 1000)
-    conv.messages.append({"role": "tool", "content": output[:12000], "tool_name": call["name"]})
+    conv.messages.append({"role": "tool", "content": output[:12000], "tool_call_id": call["id"]})
     return {
         "tool": call["name"], "server": hub.tool_owner.get(call["name"], "unknown"),
         "arguments": call["arguments"], "risk": call["risk"], "output": output,
@@ -253,15 +253,14 @@ async def run_agent(conv: Conversation, events: list[dict[str, Any]], queued: li
 
         msg = resp.choices[0].message
         tool_calls = msg.tool_calls or []
-        conv.messages.append({
-            "role": "assistant", "content": msg.content or "",
-            **({"tool_calls": [{"id": tc.id, "type": "function", "function": {"name": tc.function.name, "arguments": tc.function.arguments}}
-                                for tc in tool_calls]} if tool_calls else {}),
-        })
+        
+        # Use model_dump to preserve internal provider metadata (like Gemini thought_signature)
+        conv.messages.append(msg.model_dump(exclude_none=True))
+        
         if not tool_calls:
             return {"status": "complete", "reply": msg.content or "(no response)", "events": events}
 
-        queued = [{"name": tc.function.name, "arguments": _parse_args(tc.function.arguments),
+        queued = [{"id": tc.id, "name": tc.function.name, "arguments": _parse_args(tc.function.arguments),
                    "risk": risk_of(tc.function.name)} for tc in tool_calls]
 
     return {"status": "complete", "reply": "I stopped after reaching the maximum number of tool steps.", "events": events}
