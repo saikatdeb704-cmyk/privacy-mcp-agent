@@ -42,7 +42,7 @@ else:
     DIST_DIR = BASE_DIR.parent / "dist"
 
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
-DEFAULT_MODEL = os.environ.get("AGENT_MODEL", "llama3.2")
+DEFAULT_MODEL = os.environ.get("AGENT_MODEL", "gemini-3.8-flash").strip()
 MAX_STEPS = 8
 
 MCP_SERVERS: dict[str, Path] = {
@@ -130,9 +130,11 @@ hub = MCPHub()
 if os.environ.get("GEMINI_API_KEY"):
     if "OPENAI_API_KEY" in os.environ:
         del os.environ["OPENAI_API_KEY"]
-    llm = AsyncOpenAI(api_key=os.environ.get("GEMINI_API_KEY"), base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
+    gemini_key = os.environ.get("GEMINI_API_KEY").strip()
+    llm = AsyncOpenAI(api_key=gemini_key, base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
 elif os.environ.get("GROQ_API_KEY"):
-    llm = AsyncOpenAI(api_key=os.environ.get("GROQ_API_KEY"), base_url="https://api.groq.com/openai/v1")
+    groq_key = os.environ.get("GROQ_API_KEY").strip()
+    llm = AsyncOpenAI(api_key=groq_key, base_url="https://api.groq.com/openai/v1")
 elif os.environ.get("OPENAI_API_KEY"):
     llm = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 else:
@@ -281,7 +283,7 @@ async def health():
 
 @app.post("/api/chat")
 async def chat(req: ChatRequest):
-    model = req.model or DEFAULT_MODEL
+    model = (req.model or DEFAULT_MODEL).strip()
     conv = CONVERSATIONS.get(req.session_id)
     if conv is None:
         conv = CONVERSATIONS[req.session_id] = Conversation(model)
