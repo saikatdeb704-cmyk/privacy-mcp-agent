@@ -42,7 +42,7 @@ else:
     DIST_DIR = BASE_DIR.parent / "dist"
 
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
-DEFAULT_MODEL = os.environ.get("AGENT_MODEL", "gemini-3.8-flash").strip()
+DEFAULT_MODEL = "gemini-3.8-flash"
 MAX_STEPS = 8
 
 MCP_SERVERS: dict[str, Path] = {
