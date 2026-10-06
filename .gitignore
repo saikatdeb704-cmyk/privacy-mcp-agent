@@ -34,3 +34,7 @@ backend/data/
 backend/workspace/
 *.db
 *.exe
+
+# Secrets
+.env
+backend/.env

@@ -101,7 +101,10 @@ def list_tables() -> str:
     try:
         names = [r[0] for r in conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")]
-        lines = [f"{n}: {conn.execute(f'SELECT COUNT(*) FROM \"{n}\"').fetchone()[0]} rows" for n in names]
+        lines = []
+        for n in names:
+            count = conn.execute('SELECT COUNT(*) FROM "' + n.replace('"', '""') + '"').fetchone()[0]
+            lines.append(f"{n}: {count} rows")
         return f"Database: {DB_PATH.name}\n" + ("\n".join(lines) if lines else "No tables found.")
     finally:
         conn.close()

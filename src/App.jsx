@@ -15,6 +15,10 @@ import {
   Activity,
   AlertTriangle,
   RotateCcw,
+  Cloud,
+  Cpu,
+  Sparkles,
+  WifiOff,
 } from 'lucide-react';
 import Sidebar from './Sidebar';
 import MonitorPanel from './MonitorPanel';
@@ -60,6 +64,14 @@ const EXAMPLE_QUERIES = [
   'Give every Engineering employee a 5% raise',
 ];
 
+const MODES = [
+  { id: 'auto', label: 'Auto', icon: Sparkles, hint: 'Online when connected, local when offline' },
+  { id: 'online', label: 'Online', icon: Cloud, hint: 'Always use the cloud model' },
+  { id: 'local', label: 'Local', icon: Cpu, hint: 'Private: run on this PC with Ollama' },
+];
+
+const prettyModel = (name) => (name || '').replace(':latest', '');
+
 /* ═══════════════════════════════════════════════════════
    APP COMPONENT
    ═══════════════════════════════════════════════════════ */
@@ -70,7 +82,9 @@ export default function App() {
   const [isThinking, setIsThinking] = useState(false);
   const [health, setHealth] = useState(null);
   const [backendError, setBackendError] = useState(null);
-  const [activeModel, setActiveModel] = useState(() => localStorage.getItem('agent-model') || '');
+  const [mode, setMode] = useState(() => localStorage.getItem('agent-mode') || 'auto');
+  const [localModel, setLocalModel] = useState(() => localStorage.getItem('agent-local-model') || '');
+  const [browserOnline, setBrowserOnline] = useState(() => navigator.onLine);
   const [showMonitor, setShowMonitor] = useState(true);
   const [monitorLogs, setMonitorLogs] = useState([]);
   const [guardrailData, setGuardrailData] = useState(null);
@@ -86,12 +100,12 @@ export default function App() {
       const h = await getHealth();
       setHealth(h);
       setBackendError(null);
-      setActiveModel((current) => {
-        const names = h.ollama.models.map((m) => m.name);
+      setLocalModel((current) => {
+        const names = (h.local?.models ?? []).map((m) => m.name);
         if (current && names.includes(current)) return current;
-        const preferred = names.find((n) => n.startsWith(h.ollama.default_model)) || names[0] || h.ollama.default_model;
-        return preferred;
+        return h.local?.default_model || current || '';
       });
+      if (h.hosted) setMode((m) => (m === 'local' ? 'auto' : m));
     } catch (e) {
       setBackendError(e.message);
     }
@@ -100,12 +114,21 @@ export default function App() {
   useEffect(() => {
     refreshHealth();
     const t = setInterval(refreshHealth, 8000);
-    return () => clearInterval(t);
+    const onNet = () => {
+      setBrowserOnline(navigator.onLine);
+      setTimeout(refreshHealth, 600);
+    };
+    window.addEventListener('online', onNet);
+    window.addEventListener('offline', onNet);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener('online', onNet);
+      window.removeEventListener('offline', onNet);
+    };
   }, [refreshHealth]);
 
-  useEffect(() => {
-    if (activeModel) localStorage.setItem('agent-model', activeModel);
-  }, [activeModel]);
+  useEffect(() => { localStorage.setItem('agent-mode', mode); }, [mode]);
+  useEffect(() => { if (localModel) localStorage.setItem('agent-local-model', localModel); }, [localModel]);
 
   /* ── Scroll + textarea autosize ── */
   useEffect(() => {
@@ -190,10 +213,12 @@ export default function App() {
           role: 'agent',
           content: resp.status === 'complete' ? resp.reply : '',
           tools: fresh,
+          engine: resp.engine,
           timestamp: now(),
         },
       ]);
     }
+    if (resp.engine?.notice) flashToast(resp.engine.notice);
 
     if (resp.status === 'approval_required') {
       setGuardrailData({
@@ -223,14 +248,14 @@ export default function App() {
     shownEventsRef.current = 0;
 
     try {
-      handleAgentResponse(await sendChat(sessionId, query, activeModel));
+      handleAgentResponse(await sendChat(sessionId, query, mode, localModel));
     } catch (e) {
       pushError(e.message);
       refreshHealth();
     } finally {
       setIsThinking(false);
     }
-  }, [input, isThinking, guardrailData, sessionId, activeModel, handleAgentResponse, pushError, refreshHealth]);
+  }, [input, isThinking, guardrailData, sessionId, mode, localModel, handleAgentResponse, pushError, refreshHealth]);
 
   /* ── Guardrail decision ── */
   const decide = useCallback(async (approved) => {
@@ -262,17 +287,36 @@ export default function App() {
     }
   }, [handleSend]);
 
-  /* ── Setup status ── */
-  const ollamaOnline = health?.ollama?.online;
-  const hasModels = (health?.ollama?.models?.length ?? 0) > 0;
+  /* ── Engine + setup status ── */
+  const cloudReady = !!health?.cloud?.ready;
+  const localReady = !!health?.local?.ready;
+  const activeEngine = !health
+    ? null
+    : mode === 'online'
+      ? (cloudReady ? 'cloud' : null)
+      : mode === 'local'
+        ? (localReady ? 'local' : null)
+        : health.auto_engine;
+  const engineLabel = activeEngine === 'cloud'
+    ? prettyModel(health.cloud.model)
+    : activeEngine === 'local'
+      ? prettyModel(localModel)
+      : 'No engine';
+
   const setupIssue = backendError
-    ? { title: 'Orchestrator offline', text: 'Start the backend: run start.ps1 (or python backend/main.py).' }
-    : health && !ollamaOnline
-      ? { title: 'Ollama is not running', text: 'Open the Ollama app from the Start menu, or run: ollama serve' }
-      : health && !hasModels
-        ? { title: 'No local model installed', text: 'Download one in a terminal: ollama pull llama3.2' }
-        : null;
-  const ready = health && !setupIssue;
+    ? { title: browserOnline ? 'Agent server unreachable' : 'You are offline', text: backendError }
+    : !health
+      ? null
+      : activeEngine
+        ? null
+        : mode === 'online'
+          ? (!health.cloud.configured
+            ? { title: 'Online mode not configured', text: 'Add GEMINI_API_KEY to backend/.env (or the server environment) and restart.' }
+            : { title: 'No internet connection', text: health.hosted ? 'Reconnect to continue.' : 'Switch to Local or Auto to keep working offline.' })
+          : mode === 'local'
+            ? { title: 'Local engine unavailable', text: `${health.local.error || 'Ollama is not running.'} Open Ollama or run: ollama serve` }
+            : { title: 'No AI engine available', text: health.hosted ? 'The cloud model is unreachable right now.' : 'Connect to the internet or start Ollama (ollama pull llama3.2).' };
+  const ready = !!health && !setupIssue;
   const onlineServers = health?.servers?.filter((s) => s.online) ?? [];
 
   /* ═══════════════════════════════════════════════════════
@@ -283,21 +327,45 @@ export default function App() {
       <Sidebar
         health={health}
         backendOnline={!backendError && !!health}
-        activeModel={activeModel}
-        onModelChange={setActiveModel}
+        mode={mode}
+        activeEngine={activeEngine}
+        localModel={localModel}
+        onLocalModelChange={setLocalModel}
       />
 
       <main className="main-panel">
         <header className="panel-header">
           <div className="panel-header-left">
-            <Server size={18} color="var(--accent)" />
-            <span className="panel-header-title">Local Host Orchestrator</span>
-            <span className="header-badge accent">MCP</span>
-            <span className={`header-badge ${ready ? 'success' : 'warning'}`}>
-              {ready ? 'HITL Active' : 'Setup needed'}
-            </span>
+            <div className="mobile-logo"><ShieldCheck size={16} /></div>
+            <div className={`engine-pill ${activeEngine || 'none'}`} title={activeEngine ? `${health?.cloud?.provider ?? ''}` : ''}>
+              {activeEngine === 'cloud' ? <Cloud size={13} /> : activeEngine === 'local' ? <Cpu size={13} /> : <WifiOff size={13} />}
+              <span className="engine-pill-kind">
+                {activeEngine === 'cloud' ? 'Online' : activeEngine === 'local' ? 'Local' : 'Offline'}
+              </span>
+              <span className="engine-pill-model">{engineLabel}</span>
+            </div>
           </div>
           <div className="panel-header-actions">
+            <div className="mode-switch" role="radiogroup" aria-label="Engine mode">
+              {MODES.map(({ id, label, icon: Icon, hint }) => {
+                const disabled = id === 'local' && health?.hosted;
+                return (
+                  <button
+                    key={id}
+                    id={`mode-${id}`}
+                    role="radio"
+                    aria-checked={mode === id}
+                    className={`mode-btn ${mode === id ? 'active' : ''}`}
+                    onClick={() => setMode(id)}
+                    disabled={disabled}
+                    title={disabled ? 'Local mode is available when the agent runs on your PC' : hint}
+                  >
+                    <Icon size={13} />
+                    <span>{label}</span>
+                  </button>
+                );
+              })}
+            </div>
             <button id="new-chat-btn" className="icon-btn" onClick={handleNewChat} title="New conversation">
               <RotateCcw size={17} />
             </button>
@@ -334,22 +402,21 @@ export default function App() {
               <div className="welcome-icon">
                 <ShieldCheck size={32} />
               </div>
-              <h1 className="welcome-title">Privacy-Preserving AI Agent</h1>
+              <h1 className="welcome-title">Your private MCP agent</h1>
               <p className="welcome-subtitle">
-                A local Small Language Model that works with your files and databases through the
-                Model Context Protocol. Nothing leaves this computer, and every risky action waits
-                for your approval.
+                Works with your files and database through the Model Context Protocol. Uses the cloud
+                model when you are online and switches to a local model on this PC when you are
+                offline. Every risky action waits for your approval.
               </p>
 
               <div className="arch-grid" style={{ maxWidth: 500, width: '100%', marginTop: '0.5rem' }}>
                 <div className="arch-card">
                   <div className="arch-card-title">
-                    <Zap size={12} color="var(--accent)" /> Local LLM Runtime
+                    <Zap size={12} color="var(--accent)" /> AI Engines
                   </div>
                   <ul className="arch-card-list">
-                    {hasModels
-                      ? health.ollama.models.slice(0, 3).map((m) => <li key={m.name}>{m.name}</li>)
-                      : <li>{ollamaOnline ? 'No models pulled yet' : 'Ollama offline'}</li>}
+                    <li>{cloudReady ? `Online · ${prettyModel(health.cloud.model)}` : health?.cloud?.configured ? 'Online · no internet' : 'Online · not configured'}</li>
+                    <li>{localReady ? `Local · ${prettyModel(localModel)}` : health?.hosted ? 'Local · on your PC only' : 'Local · Ollama not running'}</li>
                   </ul>
                 </div>
                 <div className="arch-card">
@@ -412,7 +479,20 @@ export default function App() {
                   </div>
                 )}
 
-                <div className="msg-timestamp">{msg.timestamp}</div>
+                <div className="msg-timestamp">
+                  {msg.timestamp}
+                  {msg.engine && (
+                    <span className={`msg-engine ${msg.engine.kind}`}>
+                      {msg.engine.kind === 'cloud' ? <Cloud size={10} /> : <Cpu size={10} />}
+                      {prettyModel(msg.engine.model)}
+                      {msg.engine.notice ? (
+                        <span style={{ color: 'var(--warning)', marginLeft: '6px', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                          <AlertTriangle size={10} /> {msg.engine.notice}
+                        </span>
+                      ) : ''}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           ))}
@@ -439,7 +519,7 @@ export default function App() {
               id="chat-input"
               ref={textareaRef}
               rows={1}
-              placeholder={ready ? 'Ask about your files or database…' : 'Finish setup to start chatting…'}
+              placeholder={ready ? 'Ask about your files or database…' : 'Waiting for an AI engine…'}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -454,7 +534,7 @@ export default function App() {
             </button>
           </div>
           <div className="chat-hint">
-            Enter to send · Shift+Enter for new line · Model: {activeModel || '—'}
+            Enter to send · Shift+Enter for new line · {activeEngine === 'local' ? 'Private on-device' : activeEngine === 'cloud' ? 'Cloud model' : 'No engine'}
           </div>
         </div>
       </main>

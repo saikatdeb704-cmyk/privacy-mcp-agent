@@ -13,7 +13,11 @@ async function request(path, options = {}) {
       ...options,
     });
   } catch {
-    throw new Error('Cannot reach the local orchestrator. Start it with: python backend/main.py');
+    throw new Error(
+      navigator.onLine === false
+        ? 'You are offline and the agent server cannot be reached.'
+        : 'Cannot reach the agent server. On your PC start it with: python backend/main.py'
+    );
   }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.detail || `Request failed (${res.status})`);
@@ -22,10 +26,10 @@ async function request(path, options = {}) {
 
 export const getHealth = () => request('/api/health');
 
-export const sendChat = (sessionId, message, model) =>
+export const sendChat = (sessionId, message, mode, localModel) =>
   request('/api/chat', {
     method: 'POST',
-    body: JSON.stringify({ session_id: sessionId, message, model }),
+    body: JSON.stringify({ session_id: sessionId, message, mode, local_model: localModel || null }),
   });
 
 export const sendApproval = (sessionId, approvalId, approved) =>

@@ -1,0 +1,8 @@
+node_modules
+dist
+release
+backend/.venv
+backend/.env
+backend/__pycache__
+backend/build
+.git
